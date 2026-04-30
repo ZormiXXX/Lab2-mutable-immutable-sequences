@@ -1,5 +1,6 @@
 #pragma once
 #include "Exceptions.hpp"
+#include "IEnumerator.hpp"
 
 template<class T>
 class LinkedList {
@@ -13,6 +14,42 @@ private:
     Node* head;
     Node* tail;
     int length;
+
+public:
+    class Enumerator : public IEnumerator<T> {
+    private:
+        const LinkedList<T>* list;
+        const Node* current;
+        bool started;
+
+    public:
+        explicit Enumerator(const LinkedList<T>* source)
+            : list(source), current(nullptr), started(false) {}
+
+        bool MoveNext() override {
+            if (!started) {
+                current = list->head;
+                started = true;
+            } else if (current != nullptr) {
+                current = current->next;
+            }
+            return current != nullptr;
+        }
+
+        const T& GetCurrent() const override {
+            if (current == nullptr) {
+                throw InvalidState("enumerator is not positioned on an element");
+            }
+            return current->value;
+        }
+
+        void Reset() override {
+            current = nullptr;
+            started = false;
+        }
+    };
+
+private:
     
     Node* GetNode(int index) const {
         if (index < 0 || index >= length) {
@@ -62,21 +99,21 @@ public:
         }
     }
     
-    T GetFirst() const {
+    const T& GetFirst() const {
         if (length == 0) {
             throw IndexOutOfRange(0, length);
         }
         return head->value;
     }
     
-    T GetLast() const {
+    const T& GetLast() const {
         if (length == 0) {
             throw IndexOutOfRange(0, length);
         }
         return tail->value;
     }
     
-    T Get(int index) const {
+    const T& Get(int index) const {
         return GetNode(index)->value;
     }
     
@@ -84,10 +121,15 @@ public:
         if (start < 0 || end >= length || start > end) {
             throw IndexOutOfRange(start, length);
         }
-        
+
         LinkedList<T>* result = new LinkedList<T>();
+        Node* current = head;
+        for (int i = 0; i < start; i++) {
+            current = current->next;
+        }
         for (int i = start; i <= end; i++) {
-            result->Append(Get(i));
+            result->Append(current->value);
+            current = current->next;
         }
         return result;
     }
@@ -95,8 +137,21 @@ public:
     int GetLength() const {
         return length;
     }
+
+    void CopyToArray(T* destination) const {
+        Node* current = head;
+        int index = 0;
+        while (current != nullptr) {
+            destination[index++] = current->value;
+            current = current->next;
+        }
+    }
+
+    IEnumerator<T>* GetEnumerator() const {
+        return new Enumerator(this);
+    }
     
-    void Append(T item) {
+    void Append(const T& item) {
         Node* newNode = new Node(item);
         if (length == 0) {
             head = tail = newNode;
@@ -107,7 +162,7 @@ public:
         length++;
     }
     
-    void Prepend(T item) {
+    void Prepend(const T& item) {
         Node* newNode = new Node(item);
         if (length == 0) {
             head = tail = newNode;
@@ -118,7 +173,7 @@ public:
         length++;
     }
     
-    void InsertAt(T item, int index) {
+    void InsertAt(const T& item, int index) {
         if (index < 0 || index >= length) {
             throw IndexOutOfRange(index, length);
         }
@@ -135,7 +190,7 @@ public:
         length++;
     }
     
-    LinkedList<T>* Concat(LinkedList<T>* list) const {
+    LinkedList<T>* Concat(const LinkedList<T>* list) const {
         LinkedList<T>* result = new LinkedList<T>(*this);
         Node* current = list->head;
         while (current != nullptr) {

@@ -16,42 +16,27 @@ protected:
         return this;
     }
 
-    void AppendInternal(T item) {
-        items->Resize(items->GetSize() + 1);
-        items->Set(items->GetSize() - 1, item);
+    void AppendInternal(const T& item) {
+        items->Append(item);
     }
 
-    void PrependInternal(T item) {
-        DynamicArray<T>* newArr = new DynamicArray<T>(items->GetSize() + 1);
-        newArr->Set(0, item);
-        for (int i = 0; i < items->GetSize(); i++) {
-            newArr->Set(i + 1, items->Get(i));
-        }
-        delete items;
-        items = newArr;
+    void PrependInternal(const T& item) {
+        items->InsertAt(0, item);
     }
 
-    void InsertAtInternal(T item, int index) {
+    void InsertAtInternal(const T& item, int index) {
         if (index < 0 || index >= items->GetSize()) {
             throw IndexOutOfRange(index, items->GetSize());
         }
-
-        DynamicArray<T>* newArr = new DynamicArray<T>(items->GetSize() + 1);
-        for (int i = 0; i < index; i++) {
-            newArr->Set(i, items->Get(i));
-        }
-        newArr->Set(index, item);
-        for (int i = index; i < items->GetSize(); i++) {
-            newArr->Set(i + 1, items->Get(i));
-        }
-        delete items;
-        items = newArr;
+        items->InsertAt(index, item);
     }
 
-    void ConcatInternal(Sequence<T>* other) {
-        for (int i = 0; i < other->GetLength(); i++) {
-            AppendInternal(other->Get(i));
+    void ConcatInternal(const Sequence<T>* other) {
+        IEnumerator<T>* enumerator = other->GetEnumerator();
+        while (enumerator->MoveNext()) {
+            AppendInternal(enumerator->GetCurrent());
         }
+        delete enumerator;
     }
 
 public:
@@ -64,18 +49,20 @@ public:
     ArraySequence(const ArraySequence<T>& other) : items(new DynamicArray<T>(*other.items)) {}
 
     ArraySequence(const LinkedList<T>& list) : items(new DynamicArray<T>(list.GetLength())) {
-        for (int i = 0; i < list.GetLength(); i++) {
-            items->Set(i, list.Get(i));
-        }
+        list.CopyToArray(items->RawData());
     }
 
-    ArraySequence(LinkedList<T>* list) : ArraySequence(*list) {}
+    ArraySequence(const LinkedList<T>* list) : ArraySequence(*list) {}
 
     ~ArraySequence() override {
         delete items;
     }
 
-    T Get(int index) const override {
+    DynamicArray<T>* CopyStorage() const {
+        return new DynamicArray<T>(*items);
+    }
+
+    const T& Get(int index) const override {
         return items->Get(index);
     }
 
@@ -83,11 +70,11 @@ public:
         return items->GetSize();
     }
 
-    T GetFirst() const override {
+    const T& GetFirst() const override {
         return items->Get(0);
     }
 
-    T GetLast() const override {
+    const T& GetLast() const override {
         if (GetLength() == 0) {
             throw IndexOutOfRange(0, GetLength());
         }
@@ -102,36 +89,36 @@ public:
         return new ArraySequence<T>(source, count);
     }
 
-    Sequence<T>* Append(T item) override {
+    Sequence<T>* Append(const T& item) override {
         ArraySequence<T>* result = Instance();
         result->AppendInternal(item);
         return result;
     }
 
-    Sequence<T>* Prepend(T item) override {
+    Sequence<T>* Prepend(const T& item) override {
         ArraySequence<T>* result = Instance();
         result->PrependInternal(item);
         return result;
     }
 
-    Sequence<T>* InsertAt(T item, int index) override {
+    Sequence<T>* InsertAt(const T& item, int index) override {
         ArraySequence<T>* result = Instance();
         result->InsertAtInternal(item, index);
         return result;
     }
 
-    Sequence<T>* Concat(Sequence<T>* other) override {
+    Sequence<T>* Concat(const Sequence<T>* other) override {
         ArraySequence<T>* result = Instance();
         result->ConcatInternal(other);
         return result;
     }
 
-    Sequence<T>* GetSubsequence(int start, int end) override {
+    Sequence<T>* GetSubsequence(int start, int end) const override {
         if (start < 0 || end >= GetLength() || start > end) {
             throw IndexOutOfRange(start, GetLength());
         }
 
-        Sequence<T>* result = CreateEmpty();
+        Sequence<T>* result = this->CreateAccumulator();
         for (int i = start; i <= end; i++) {
             Sequence<T>* updated = result->Append(items->Get(i));
             if (updated != result) {
@@ -139,7 +126,7 @@ public:
             }
             result = updated;
         }
-        return result;
+        return this->FinalizeAccumulator(result);
     }
 
     T& operator[](int index) {

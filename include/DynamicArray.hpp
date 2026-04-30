@@ -57,22 +57,49 @@ public:
         delete[] data;
     }
     
-    T Get(int index) const {
+    const T& Get(int index) const {
         if (index < 0 || index >= size) {
             throw IndexOutOfRange(index, size);
         }
         return data[index];
     }
     
-    void Set(int index, T value) {
+    void Set(int index, const T& value) {
         if (index < 0 || index >= size) {
             throw IndexOutOfRange(index, size);
         }
         data[index] = value;
     }
+
+    void Append(const T& value) {
+        EnsureCapacity(size + 1);
+        data[size] = value;
+        size++;
+    }
+
+    void InsertAt(int index, const T& value) {
+        if (index < 0 || index > size) {
+            throw IndexOutOfRange(index, size);
+        }
+
+        EnsureCapacity(size + 1);
+        for (int i = size; i > index; i--) {
+            data[i] = data[i - 1];
+        }
+        data[index] = value;
+        size++;
+    }
     
     int GetSize() const {
         return size;
+    }
+
+    T* RawData() {
+        return data;
+    }
+
+    const T* RawData() const {
+        return data;
     }
     
     void Resize(int newSize) {

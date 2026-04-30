@@ -3,7 +3,6 @@
 #include "IEnumerable.hpp"
 #include "Option.hpp"
 #include <algorithm>
-#include <stdexcept>
 #include <tuple>
 #include <utility>
 
@@ -23,25 +22,34 @@ public:
     explicit SequenceEnumerator(const Sequence<T>* seq) : sequence(seq), index(-1) {}
 
     bool MoveNext() override;
-    T GetCurrent() const override;
+    const T& GetCurrent() const override;
     void Reset() override;
 };
 
 template<class T>
 class Sequence : public IEnumerable<T> {
+protected:
+    virtual Sequence<T>* CreateAccumulator() const {
+        return CreateEmpty();
+    }
+
+    virtual Sequence<T>* FinalizeAccumulator(Sequence<T>* accumulator) const {
+        return accumulator;
+    }
+
 public:
     virtual ~Sequence() = default;
 
-    virtual T Get(int index) const = 0;
+    virtual const T& Get(int index) const = 0;
     virtual int GetLength() const = 0;
-    virtual T GetFirst() const = 0;
-    virtual T GetLast() const = 0;
+    virtual const T& GetFirst() const = 0;
+    virtual const T& GetLast() const = 0;
 
-    virtual Sequence<T>* Append(T item) = 0;
-    virtual Sequence<T>* Prepend(T item) = 0;
-    virtual Sequence<T>* InsertAt(T item, int index) = 0;
-    virtual Sequence<T>* Concat(Sequence<T>* other) = 0;
-    virtual Sequence<T>* GetSubsequence(int start, int end) = 0;
+    virtual Sequence<T>* Append(const T& item) = 0;
+    virtual Sequence<T>* Prepend(const T& item) = 0;
+    virtual Sequence<T>* InsertAt(const T& item, int index) = 0;
+    virtual Sequence<T>* Concat(const Sequence<T>* other) = 0;
+    virtual Sequence<T>* GetSubsequence(int start, int end) const = 0;
     virtual Sequence<T>* CreateEmpty() const = 0;
     virtual Sequence<T>* CreateFromArray(const T* items, int count) const = 0;
 
@@ -49,22 +57,25 @@ public:
 
     template<typename Func>
     Sequence<T>* Map(Func f) const {
-        Sequence<T>* result = CreateEmpty();
-        for (int i = 0; i < GetLength(); i++) {
-            Sequence<T>* updated = result->Append(f(Get(i)));
+        Sequence<T>* result = CreateAccumulator();
+        IEnumerator<T>* enumerator = GetEnumerator();
+        while (enumerator->MoveNext()) {
+            Sequence<T>* updated = result->Append(f(enumerator->GetCurrent()));
             if (updated != result) {
                 delete result;
             }
             result = updated;
         }
-        return result;
+        delete enumerator;
+        return FinalizeAccumulator(result);
     }
 
     template<typename Func>
     Sequence<T>* FlatMap(Func f) const {
-        Sequence<T>* result = CreateEmpty();
-        for (int i = 0; i < GetLength(); i++) {
-            Sequence<T>* expanded = f(Get(i));
+        Sequence<T>* result = CreateAccumulator();
+        IEnumerator<T>* enumerator = GetEnumerator();
+        while (enumerator->MoveNext()) {
+            Sequence<T>* expanded = f(enumerator->GetCurrent());
             Sequence<T>* updated = result->Concat(expanded);
             if (updated != result) {
                 delete result;
@@ -72,23 +83,27 @@ public:
             result = updated;
             delete expanded;
         }
-        return result;
+        delete enumerator;
+        return FinalizeAccumulator(result);
     }
 
     template<typename Func, typename U>
     U Reduce(Func f, U initial) const {
         U result = initial;
-        for (int i = 0; i < GetLength(); i++) {
-            result = f(Get(i), result);
+        IEnumerator<T>* enumerator = GetEnumerator();
+        while (enumerator->MoveNext()) {
+            result = f(enumerator->GetCurrent(), result);
         }
+        delete enumerator;
         return result;
     }
 
     template<typename Predicate>
     Sequence<T>* Where(Predicate pred) const {
-        Sequence<T>* result = CreateEmpty();
-        for (int i = 0; i < GetLength(); i++) {
-            T item = Get(i);
+        Sequence<T>* result = CreateAccumulator();
+        IEnumerator<T>* enumerator = GetEnumerator();
+        while (enumerator->MoveNext()) {
+            T item = enumerator->GetCurrent();
             if (pred(item)) {
                 Sequence<T>* updated = result->Append(item);
                 if (updated != result) {
@@ -97,27 +112,36 @@ public:
                 result = updated;
             }
         }
-        return result;
+        delete enumerator;
+        return FinalizeAccumulator(result);
     }
 
     template<typename Predicate>
     T Find(Predicate pred) const {
-        for (int i = 0; i < GetLength(); i++) {
-            T item = Get(i);
+        IEnumerator<T>* enumerator = GetEnumerator();
+        while (enumerator->MoveNext()) {
+            T item = enumerator->GetCurrent();
             if (pred(item)) {
+                delete enumerator;
                 return item;
             }
         }
+        delete enumerator;
         throw ElementNotFound();
     }
 
     template<typename U>
-    Sequence<std::tuple<T, U>>* Zip(Sequence<U>* other) const {
-        int minLen = std::min(GetLength(), other->GetLength());
+    Sequence<std::tuple<T, U>>* Zip(const Sequence<U>* other) const {
         auto* result = new ArraySequence<std::tuple<T, U>>();
-        for (int i = 0; i < minLen; i++) {
-            result->Append(std::make_tuple(Get(i), other->Get(i)));
+        IEnumerator<T>* left = GetEnumerator();
+        IEnumerator<U>* right = other->GetEnumerator();
+
+        while (left->MoveNext() && right->MoveNext()) {
+            result->Append(std::make_tuple(left->GetCurrent(), right->GetCurrent()));
         }
+
+        delete left;
+        delete right;
         return result;
     }
 
@@ -130,11 +154,13 @@ public:
         auto* first = new ArraySequence<First>();
         auto* second = new ArraySequence<Second>();
 
-        for (int i = 0; i < GetLength(); i++) {
-            Tuple item = Get(i);
+        IEnumerator<T>* enumerator = GetEnumerator();
+        while (enumerator->MoveNext()) {
+            Tuple item = enumerator->GetCurrent();
             first->Append(std::get<0>(item));
             second->Append(std::get<1>(item));
         }
+        delete enumerator;
 
         return {first, second};
     }
@@ -142,14 +168,15 @@ public:
     template<typename Predicate>
     Sequence<Sequence<T>*>* Split(Predicate pred) const {
         auto* result = new ArraySequence<Sequence<T>*>();
-        Sequence<T>* current = CreateEmpty();
+        Sequence<T>* current = CreateAccumulator();
+        IEnumerator<T>* enumerator = GetEnumerator();
 
-        for (int i = 0; i < GetLength(); i++) {
-            T item = Get(i);
+        while (enumerator->MoveNext()) {
+            T item = enumerator->GetCurrent();
             if (pred(item)) {
                 if (current->GetLength() > 0) {
-                    result->Append(current);
-                    current = CreateEmpty();
+                    result->Append(FinalizeAccumulator(current));
+                    current = CreateAccumulator();
                 }
             } else {
                 Sequence<T>* updated = current->Append(item);
@@ -159,9 +186,10 @@ public:
                 current = updated;
             }
         }
+        delete enumerator;
 
         if (current->GetLength() > 0) {
-            result->Append(current);
+            result->Append(FinalizeAccumulator(current));
         } else {
             delete current;
         }
@@ -169,9 +197,9 @@ public:
         return result;
     }
 
-    Sequence<T>* Slice(int index, int count, Sequence<T>* replacement = nullptr) const {
+    Sequence<T>* Slice(int index, int count, const Sequence<T>* replacement = nullptr) const {
         if (count < 0) {
-            throw std::invalid_argument("count must be non-negative");
+            throw InvalidArgument("count must be non-negative");
         }
 
         int actualIndex = index;
@@ -183,40 +211,55 @@ public:
             throw IndexOutOfRange(index, GetLength());
         }
 
-        Sequence<T>* result = CreateEmpty();
-
-        for (int i = 0; i < actualIndex; i++) {
-            Sequence<T>* updated = result->Append(Get(i));
-            if (updated != result) {
-                delete result;
-            }
-            result = updated;
-        }
-
-        if (replacement != nullptr) {
-            for (int i = 0; i < replacement->GetLength(); i++) {
-                Sequence<T>* updated = result->Append(replacement->Get(i));
-                if (updated != result) {
-                    delete result;
-                }
-                result = updated;
-            }
-        }
-
         int skipUntil = actualIndex + count;
         if (skipUntil < actualIndex) {
             skipUntil = GetLength();
         }
 
-        for (int i = std::min(skipUntil, GetLength()); i < GetLength(); i++) {
-            Sequence<T>* updated = result->Append(Get(i));
-            if (updated != result) {
-                delete result;
+        Sequence<T>* result = CreateAccumulator();
+        IEnumerator<T>* source = GetEnumerator();
+        int currentIndex = 0;
+        bool replacementInserted = false;
+
+        while (source->MoveNext()) {
+            if (!replacementInserted && currentIndex == actualIndex && replacement != nullptr) {
+                IEnumerator<T>* replacementEnumerator = replacement->GetEnumerator();
+                while (replacementEnumerator->MoveNext()) {
+                    Sequence<T>* updated = result->Append(replacementEnumerator->GetCurrent());
+                    if (updated != result) {
+                        delete result;
+                    }
+                    result = updated;
+                }
+                delete replacementEnumerator;
+                replacementInserted = true;
             }
-            result = updated;
+
+            T item = source->GetCurrent();
+            if (currentIndex < actualIndex || currentIndex >= skipUntil) {
+                Sequence<T>* updated = result->Append(item);
+                if (updated != result) {
+                    delete result;
+                }
+                result = updated;
+            }
+            currentIndex++;
+        }
+        delete source;
+
+        if (!replacementInserted && replacement != nullptr) {
+            IEnumerator<T>* replacementEnumerator = replacement->GetEnumerator();
+            while (replacementEnumerator->MoveNext()) {
+                Sequence<T>* updated = result->Append(replacementEnumerator->GetCurrent());
+                if (updated != result) {
+                    delete result;
+                }
+                result = updated;
+            }
+            delete replacementEnumerator;
         }
 
-        return result;
+        return FinalizeAccumulator(result);
     }
 
     Option<T> TryGet(int index) const {
@@ -228,12 +271,15 @@ public:
 
     template<typename Predicate>
     Option<T> TryFind(Predicate pred) const {
-        for (int i = 0; i < GetLength(); i++) {
-            T item = Get(i);
+        IEnumerator<T>* enumerator = GetEnumerator();
+        while (enumerator->MoveNext()) {
+            T item = enumerator->GetCurrent();
             if (pred(item)) {
+                delete enumerator;
                 return Option<T>::Some(item);
             }
         }
+        delete enumerator;
         return Option<T>::None();
     }
 
@@ -251,7 +297,7 @@ public:
         return Option<T>::Some(GetLast());
     }
 
-    T operator[](int index) const {
+    const T& operator[](int index) const {
         return Get(index);
     }
 
@@ -271,7 +317,7 @@ bool SequenceEnumerator<T>::MoveNext() {
 }
 
 template<class T>
-T SequenceEnumerator<T>::GetCurrent() const {
+const T& SequenceEnumerator<T>::GetCurrent() const {
     if (index < 0 || index >= sequence->GetLength()) {
         throw IndexOutOfRange(index, sequence->GetLength());
     }

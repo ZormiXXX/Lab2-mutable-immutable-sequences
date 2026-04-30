@@ -17,14 +17,14 @@ public:
 
     MutableArraySequence(const T* arr, int count) : ArraySequence<T>(arr, count) {}
 
-    MutableArraySequence(DynamicArray<T>* arr) : ArraySequence<T>(arr) {}
+    explicit MutableArraySequence(DynamicArray<T>* arr) : ArraySequence<T>(arr) {}
 
     MutableArraySequence(const MutableArraySequence<T>& other)
         : ArraySequence<T>(new DynamicArray<T>(*other.items)) {}
 
     explicit MutableArraySequence(const LinkedList<T>& list) : ArraySequence<T>(list) {}
 
-    explicit MutableArraySequence(LinkedList<T>* list) : ArraySequence<T>(list) {}
+    explicit MutableArraySequence(const LinkedList<T>* list) : ArraySequence<T>(list) {}
 
     ~MutableArraySequence() override = default;
 

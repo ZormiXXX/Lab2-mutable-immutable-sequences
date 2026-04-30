@@ -1,7 +1,11 @@
 #include <chrono>
+#include <clocale>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <tuple>
+#include <vector>
+
 #include "../include/Immutable/ImmutableArraySequence.hpp"
 #include "../include/Immutable/ImmutableListSequence.hpp"
 #include "../include/Mutable/MutableArraySequence.hpp"
@@ -9,68 +13,178 @@
 
 namespace {
 
-void ShowMenu() {
-    std::cout << "\n╔══════════════════════════════════════════════════════════╗" << std::endl;
-    std::cout << "║           ЛАБОРАТОРНАЯ РАБОТА №2 - МЕНЮ                   ║" << std::endl;
-    std::cout << "╠══════════════════════════════════════════════════════════╣" << std::endl;
-    std::cout << "║  СОЗДАНИЕ:                                               ║" << std::endl;
-    std::cout << "║   1. Создать MutableArraySequence                        ║" << std::endl;
-    std::cout << "║   2. Создать ImmutableArraySequence                      ║" << std::endl;
-    std::cout << "║   3. Создать MutableListSequence                         ║" << std::endl;
-    std::cout << "║   4. Создать ImmutableListSequence                       ║" << std::endl;
-    std::cout << "╠══════════════════════════════════════════════════════════╣" << std::endl;
-    std::cout << "║  ОСНОВНЫЕ ОПЕРАЦИИ:                                      ║" << std::endl;
-    std::cout << "║   5. Append (добавить в конец)                           ║" << std::endl;
-    std::cout << "║   6. Prepend (добавить в начало)                         ║" << std::endl;
-    std::cout << "║   7. InsertAt (вставить по индексу)                      ║" << std::endl;
-    std::cout << "║   8. Concat (сцепить две последовательности)             ║" << std::endl;
-    std::cout << "║   9. GetSubsequence (подпоследовательность)              ║" << std::endl;
-    std::cout << "║   10. Slice (заменить фрагмент)                          ║" << std::endl;
-    std::cout << "╠══════════════════════════════════════════════════════════╣" << std::endl;
-    std::cout << "║  MAP-REDUCE И ДОПОЛНЕНИЯ:                                ║" << std::endl;
-    std::cout << "║   11. Map                                                ║" << std::endl;
-    std::cout << "║   12. FlatMap                                            ║" << std::endl;
-    std::cout << "║   13. Reduce                                             ║" << std::endl;
-    std::cout << "║   14. Where                                              ║" << std::endl;
-    std::cout << "║   15. Find / TryFind                                     ║" << std::endl;
-    std::cout << "║   16. Zip                                                ║" << std::endl;
-    std::cout << "║   17. Unzip                                              ║" << std::endl;
-    std::cout << "║   18. Split                                              ║" << std::endl;
-    std::cout << "║   19. IEnumerable / IEnumerator                          ║" << std::endl;
-    std::cout << "╠══════════════════════════════════════════════════════════╣" << std::endl;
-    std::cout << "║  ИНФОРМАЦИЯ И ПРОВЕРКА:                                  ║" << std::endl;
-    std::cout << "║   20. Показать последовательность                        ║" << std::endl;
-    std::cout << "║   21. Показать длину                                     ║" << std::endl;
-    std::cout << "║   22. Запустить модульные тесты                          ║" << std::endl;
-    std::cout << "║   23. Сравнить производительность                        ║" << std::endl;
-    std::cout << "╠══════════════════════════════════════════════════════════╣" << std::endl;
-    std::cout << "║   0. Выход                                               ║" << std::endl;
-    std::cout << "╚══════════════════════════════════════════════════════════╝" << std::endl;
-    std::cout << "> ";
+std::string Truncate(const std::string& text, std::size_t limit) {
+    if (text.size() <= limit) {
+        return text;
+    }
+    return text.substr(0, limit - 3) + "...";
 }
 
 template<class T>
-void PrintSequence(const std::string& label, Sequence<T>* seq) {
-    std::cout << "\n    " << label << ": [";
-    for (int i = 0; i < seq->GetLength(); i++) {
-        std::cout << seq->Get(i);
-        if (i < seq->GetLength() - 1) {
-            std::cout << ", ";
+std::string FormatSequence(const Sequence<T>* seq) {
+    std::ostringstream builder;
+    builder << "[";
+    IEnumerator<T>* enumerator = seq->GetEnumerator();
+    bool first = true;
+    while (enumerator->MoveNext()) {
+        if (!first) {
+            builder << ", ";
         }
+        builder << enumerator->GetCurrent();
+        first = false;
     }
-    std::cout << "]" << std::endl;
+    delete enumerator;
+    builder << "]";
+    return builder.str();
 }
 
-void PrintTupleSequence(const std::string& label, Sequence<std::tuple<int, char>>* seq) {
-    std::cout << "\n    " << label << ": [";
-    for (int i = 0; i < seq->GetLength(); i++) {
-        auto item = seq->Get(i);
-        std::cout << "(" << std::get<0>(item) << ", " << std::get<1>(item) << ")";
-        if (i < seq->GetLength() - 1) {
-            std::cout << ", ";
+std::string FormatTupleSequence(const Sequence<std::tuple<int, char>>* seq) {
+    std::ostringstream builder;
+    builder << "[";
+    IEnumerator<std::tuple<int, char>>* enumerator = seq->GetEnumerator();
+    bool first = true;
+    while (enumerator->MoveNext()) {
+        if (!first) {
+            builder << ", ";
         }
+        auto item = enumerator->GetCurrent();
+        builder << "(" << std::get<0>(item) << ", " << std::get<1>(item) << ")";
+        first = false;
     }
-    std::cout << "]" << std::endl;
+    delete enumerator;
+    builder << "]";
+    return builder.str();
+}
+
+template<class T>
+void PrintSequence(const std::string& label, const Sequence<T>* seq) {
+    std::cout << "\n    " << label << ": " << FormatSequence(seq) << std::endl;
+}
+
+void PrintTupleSequence(const std::string& label, const Sequence<std::tuple<int, char>>* seq) {
+    std::cout << "\n    " << label << ": " << FormatTupleSequence(seq) << std::endl;
+}
+
+std::string GetSequenceTypeName(const Sequence<int>* seq) {
+    if (seq == nullptr) {
+        return "не создана";
+    }
+    if (dynamic_cast<const MutableArraySequence<int>*>(seq) != nullptr) {
+        return "MutableArraySequence";
+    }
+    if (dynamic_cast<const ImmutableArraySequence<int>*>(seq) != nullptr) {
+        return "ImmutableArraySequence";
+    }
+    if (dynamic_cast<const MutableListSequence<int>*>(seq) != nullptr) {
+        return "MutableListSequence";
+    }
+    if (dynamic_cast<const ImmutableListSequence<int>*>(seq) != nullptr) {
+        return "ImmutableListSequence";
+    }
+    return "Sequence<int>";
+}
+
+std::string DescribeSequence(const Sequence<int>* seq) {
+    if (seq == nullptr) {
+        return "последовательность ещё не создана";
+    }
+
+    std::ostringstream builder;
+    builder << GetSequenceTypeName(seq)
+            << ", длина = " << seq->GetLength()
+            << ", данные = " << Truncate(FormatSequence(seq), 42);
+    return builder.str();
+}
+
+void ShowMenu(const Sequence<int>* seq) {
+    std::cout << "\n╔══════════════════════════════════════════════════════════╗" << std::endl;
+    std::cout << "║           ЛАБОРАТОРНАЯ РАБОТА №2 - МЕНЮ                 ║" << std::endl;
+    std::cout << "╠══════════════════════════════════════════════════════════╣" << std::endl;
+    std::cout << "║  СОЗДАНИЕ:                                              ║" << std::endl;
+    std::cout << "║   1. Создать MutableArraySequence                       ║" << std::endl;
+    std::cout << "║   2. Создать ImmutableArraySequence                     ║" << std::endl;
+    std::cout << "║   3. Создать MutableListSequence                        ║" << std::endl;
+    std::cout << "║   4. Создать ImmutableListSequence                      ║" << std::endl;
+    std::cout << "╠══════════════════════════════════════════════════════════╣" << std::endl;
+    std::cout << "║  ОСНОВНЫЕ ОПЕРАЦИИ:                                     ║" << std::endl;
+    std::cout << "║   5. Append (добавить в конец)                          ║" << std::endl;
+    std::cout << "║   6. Prepend (добавить в начало)                        ║" << std::endl;
+    std::cout << "║   7. InsertAt (вставить по индексу)                     ║" << std::endl;
+    std::cout << "║   8. Concat (сцепить две последовательности)            ║" << std::endl;
+    std::cout << "║   9. GetSubsequence (подпоследовательность)             ║" << std::endl;
+    std::cout << "║   10. Slice (заменить фрагмент)                         ║" << std::endl;
+    std::cout << "╠══════════════════════════════════════════════════════════╣" << std::endl;
+    std::cout << "║  MAP-REDUCE И ДОПОЛНЕНИЯ:                               ║" << std::endl;
+    std::cout << "║   11. Map                                               ║" << std::endl;
+    std::cout << "║   12. FlatMap                                           ║" << std::endl;
+    std::cout << "║   13. Reduce                                            ║" << std::endl;
+    std::cout << "║   14. Where                                             ║" << std::endl;
+    std::cout << "║   15. Find / TryFind                                    ║" << std::endl;
+    std::cout << "║   16. Zip                                               ║" << std::endl;
+    std::cout << "║   17. Unzip                                             ║" << std::endl;
+    std::cout << "║   18. Split                                             ║" << std::endl;
+    std::cout << "║   19. IEnumerable / IEnumerator                         ║" << std::endl;
+    std::cout << "╠══════════════════════════════════════════════════════════╣" << std::endl;
+    std::cout << "║  ИНФОРМАЦИЯ И ПРОВЕРКА:                                 ║" << std::endl;
+    std::cout << "║   20. Показать последовательность                       ║" << std::endl;
+    std::cout << "║   21. Показать длину                                    ║" << std::endl;
+    std::cout << "║   22. Запустить модульные тесты                         ║" << std::endl;
+    std::cout << "║   23. Сравнить производительность                       ║" << std::endl;
+    std::cout << "╠══════════════════════════════════════════════════════════╣" << std::endl;
+    std::cout << "║   0. Выход                                              ║" << std::endl;
+    std::cout << "╚══════════════════════════════════════════════════════════╝" << std::endl;
+    std::cout << "Текущее состояние: " << DescribeSequence(seq) << std::endl;
+    std::cout << "> ";
+}
+
+int ReadInt(const std::string& prompt) {
+    while (true) {
+        std::cout << prompt;
+        std::string line;
+        if (!std::getline(std::cin, line)) {
+            throw InputError("Ввод прерван");
+        }
+
+        std::istringstream input(line);
+        int value = 0;
+        char extra = '\0';
+        if ((input >> value) && !(input >> extra)) {
+            return value;
+        }
+
+        std::cout << "Некорректный ввод. Введите целое число." << std::endl;
+    }
+}
+
+std::vector<int> ReadSequenceValues(const std::string& label) {
+    int length = ReadInt("Введите количество элементов для " + label + ": ");
+    if (length < 0) {
+        throw InvalidArgument("количество элементов не может быть отрицательным");
+    }
+
+    std::vector<int> values(static_cast<std::size_t>(length));
+    for (int i = 0; i < length; i++) {
+        values[static_cast<std::size_t>(i)] = ReadInt("Элемент [" + std::to_string(i) + "]: ");
+    }
+    return values;
+}
+
+template<class ConcreteSequence>
+Sequence<int>* CreateSequenceInteractively(const std::string& label) {
+    std::vector<int> values = ReadSequenceValues(label);
+    auto* created = new ConcreteSequence(values.data(), static_cast<int>(values.size()));
+    std::cout << "Создана " << label << ": " << FormatSequence(created) << std::endl;
+    return created;
+}
+
+Sequence<int>* CreateHelperSequence(const std::string& label) {
+    std::vector<int> values = ReadSequenceValues(label);
+    return Sequence<int>::From(values.data(), static_cast<int>(values.size()));
+}
+
+void ReplaceCurrentSequence(Sequence<int>*& current, Sequence<int>* replacement) {
+    delete current;
+    current = replacement;
 }
 
 void UpdateCurrentSequence(Sequence<int>*& current, Sequence<int>* updated) {
@@ -82,7 +196,7 @@ void UpdateCurrentSequence(Sequence<int>*& current, Sequence<int>* updated) {
 
 void RequireSequence(Sequence<int>* seq) {
     if (seq == nullptr) {
-        throw std::runtime_error("Сначала создайте последовательность");
+        throw InvalidState("сначала создайте последовательность");
     }
 }
 
@@ -137,74 +251,49 @@ int main() {
     std::cout << "=============================================================" << std::endl;
 
     while (true) {
-        ShowMenu();
-        int choice = 0;
-        std::cin >> choice;
+        ShowMenu(seq);
 
         try {
+            int choice = ReadInt("");
+
             switch (choice) {
-                case 1: {
-                    int arr[] = {1, 2, 3, 4, 5};
-                    delete seq;
-                    seq = new MutableArraySequence<int>(arr, 5);
-                    std::cout << "Создана MutableArraySequence: [1, 2, 3, 4, 5]" << std::endl;
+                case 1:
+                    ReplaceCurrentSequence(seq, CreateSequenceInteractively<MutableArraySequence<int>>("MutableArraySequence"));
                     break;
-                }
-                case 2: {
-                    int arr[] = {1, 2, 3, 4, 5};
-                    delete seq;
-                    seq = new ImmutableArraySequence<int>(arr, 5);
-                    std::cout << "Создана ImmutableArraySequence: [1, 2, 3, 4, 5]" << std::endl;
+                case 2:
+                    ReplaceCurrentSequence(seq, CreateSequenceInteractively<ImmutableArraySequence<int>>("ImmutableArraySequence"));
                     break;
-                }
-                case 3: {
-                    int arr[] = {1, 2, 3, 4, 5};
-                    delete seq;
-                    seq = new MutableListSequence<int>(arr, 5);
-                    std::cout << "Создана MutableListSequence: [1, 2, 3, 4, 5]" << std::endl;
+                case 3:
+                    ReplaceCurrentSequence(seq, CreateSequenceInteractively<MutableListSequence<int>>("MutableListSequence"));
                     break;
-                }
-                case 4: {
-                    int arr[] = {1, 2, 3, 4, 5};
-                    delete seq;
-                    seq = new ImmutableListSequence<int>(arr, 5);
-                    std::cout << "Создана ImmutableListSequence: [1, 2, 3, 4, 5]" << std::endl;
+                case 4:
+                    ReplaceCurrentSequence(seq, CreateSequenceInteractively<ImmutableListSequence<int>>("ImmutableListSequence"));
                     break;
-                }
                 case 5: {
                     RequireSequence(seq);
-                    int value = 0;
-                    std::cout << "Введите значение: ";
-                    std::cin >> value;
+                    int value = ReadInt("Введите значение: ");
                     UpdateCurrentSequence(seq, seq->Append(value));
                     PrintSequence("После Append", seq);
                     break;
                 }
                 case 6: {
                     RequireSequence(seq);
-                    int value = 0;
-                    std::cout << "Введите значение: ";
-                    std::cin >> value;
+                    int value = ReadInt("Введите значение: ");
                     UpdateCurrentSequence(seq, seq->Prepend(value));
                     PrintSequence("После Prepend", seq);
                     break;
                 }
                 case 7: {
                     RequireSequence(seq);
-                    int value = 0;
-                    int index = 0;
-                    std::cout << "Введите значение: ";
-                    std::cin >> value;
-                    std::cout << "Введите индекс: ";
-                    std::cin >> index;
+                    int value = ReadInt("Введите значение: ");
+                    int index = ReadInt("Введите индекс: ");
                     UpdateCurrentSequence(seq, seq->InsertAt(value, index));
                     PrintSequence("После InsertAt", seq);
                     break;
                 }
                 case 8: {
                     RequireSequence(seq);
-                    int arr[] = {10, 20, 30};
-                    Sequence<int>* extra = Sequence<int>::From(arr, 3);
+                    Sequence<int>* extra = CreateHelperSequence("второй последовательности");
                     PrintSequence("Вторая последовательность", extra);
                     UpdateCurrentSequence(seq, seq->Concat(extra));
                     PrintSequence("После Concat", seq);
@@ -213,12 +302,8 @@ int main() {
                 }
                 case 9: {
                     RequireSequence(seq);
-                    int start = 0;
-                    int end = 0;
-                    std::cout << "Начальный индекс: ";
-                    std::cin >> start;
-                    std::cout << "Конечный индекс: ";
-                    std::cin >> end;
+                    int start = ReadInt("Начальный индекс: ");
+                    int end = ReadInt("Конечный индекс: ");
                     Sequence<int>* sub = seq->GetSubsequence(start, end);
                     PrintSequence("Подпоследовательность", sub);
                     delete sub;
@@ -226,15 +311,9 @@ int main() {
                 }
                 case 10: {
                     RequireSequence(seq);
-                    int index = 0;
-                    int count = 0;
-                    std::cout << "Индекс начала: ";
-                    std::cin >> index;
-                    std::cout << "Количество элементов для удаления: ";
-                    std::cin >> count;
-
-                    int arr[] = {99, 100};
-                    Sequence<int>* replacement = Sequence<int>::From(arr, 2);
+                    int index = ReadInt("Индекс начала: ");
+                    int count = ReadInt("Количество элементов для удаления: ");
+                    Sequence<int>* replacement = CreateHelperSequence("заменяющей последовательности");
                     PrintSequence("Заменяющая последовательность", replacement);
                     UpdateCurrentSequence(seq, seq->Slice(index, count, replacement));
                     PrintSequence("После Slice", seq);
@@ -254,7 +333,7 @@ int main() {
                         int arr[] = {value, value * 10};
                         return Sequence<int>::From(arr, 2);
                     });
-                    PrintSequence("FlatMap ([x, x*10])", flatMapped);
+                    PrintSequence("FlatMap ([x, x * 10])", flatMapped);
                     delete flatMapped;
                     break;
                 }
@@ -276,9 +355,7 @@ int main() {
                 }
                 case 15: {
                     RequireSequence(seq);
-                    int target = 0;
-                    std::cout << "Введите искомое значение: ";
-                    std::cin >> target;
+                    int target = ReadInt("Введите искомое значение: ");
 
                     try {
                         int found = seq->Find([target](int value) { return value == target; });
@@ -349,34 +426,32 @@ int main() {
                     delete enumerator;
                     break;
                 }
-                case 20: {
+                case 20:
                     RequireSequence(seq);
                     PrintSequence("Текущая последовательность", seq);
                     break;
-                }
-                case 21: {
+                case 21:
                     RequireSequence(seq);
                     std::cout << "Длина последовательности: " << seq->GetLength() << std::endl;
                     break;
-                }
-                case 22: {
+                case 22:
                     RunAllTests();
                     break;
-                }
-                case 23: {
+                case 23:
                     RunPerformanceComparison();
                     break;
-                }
-                case 0: {
+                case 0:
                     delete seq;
                     std::cout << "\nВыход из программы..." << std::endl;
                     return 0;
-                }
                 default:
-                    std::cout << "Неверный выбор! Попробуйте снова." << std::endl;
+                    std::cout << "Неверный выбор. Попробуйте снова." << std::endl;
+                    break;
             }
-        } catch (const std::exception& error) {
+        } catch (const Exception& error) {
             std::cout << "Ошибка: " << error.what() << std::endl;
+        } catch (...) {
+            std::cout << "Ошибка: неизвестное исключение" << std::endl;
         }
     }
 }

@@ -22,7 +22,7 @@ public:
 
     explicit MutableListSequence(const LinkedList<T>& list) : ListSequence<T>(list) {}
 
-    explicit MutableListSequence(LinkedList<T>* list) : ListSequence<T>(list) {}
+    explicit MutableListSequence(const LinkedList<T>* list) : ListSequence<T>(list) {}
 
     ~MutableListSequence() override = default;
 

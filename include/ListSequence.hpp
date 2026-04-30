@@ -15,22 +15,24 @@ protected:
         return this;
     }
 
-    void AppendInternal(T item) {
+    void AppendInternal(const T& item) {
         items->Append(item);
     }
 
-    void PrependInternal(T item) {
+    void PrependInternal(const T& item) {
         items->Prepend(item);
     }
 
-    void InsertAtInternal(T item, int index) {
+    void InsertAtInternal(const T& item, int index) {
         items->InsertAt(item, index);
     }
 
-    void ConcatInternal(Sequence<T>* other) {
-        for (int i = 0; i < other->GetLength(); i++) {
-            items->Append(other->Get(i));
+    void ConcatInternal(const Sequence<T>* other) {
+        IEnumerator<T>* enumerator = other->GetEnumerator();
+        while (enumerator->MoveNext()) {
+            items->Append(enumerator->GetCurrent());
         }
+        delete enumerator;
     }
 
 public:
@@ -42,13 +44,17 @@ public:
 
     explicit ListSequence(const LinkedList<T>& list) : items(new LinkedList<T>(list)) {}
 
-    explicit ListSequence(LinkedList<T>* list) : items(new LinkedList<T>(*list)) {}
+    explicit ListSequence(const LinkedList<T>* list) : items(new LinkedList<T>(*list)) {}
 
     ~ListSequence() override {
         delete items;
     }
 
-    T Get(int index) const override {
+    LinkedList<T>* CopyStorage() const {
+        return new LinkedList<T>(*items);
+    }
+
+    const T& Get(int index) const override {
         return items->Get(index);
     }
 
@@ -56,11 +62,11 @@ public:
         return items->GetLength();
     }
 
-    T GetFirst() const override {
+    const T& GetFirst() const override {
         return items->GetFirst();
     }
 
-    T GetLast() const override {
+    const T& GetLast() const override {
         return items->GetLast();
     }
 
@@ -72,43 +78,56 @@ public:
         return new ListSequence<T>(itemsArr, count);
     }
 
-    Sequence<T>* Append(T item) override {
+    IEnumerator<T>* GetEnumerator() const override {
+        return items->GetEnumerator();
+    }
+
+    Sequence<T>* Append(const T& item) override {
         ListSequence<T>* result = Instance();
         result->AppendInternal(item);
         return result;
     }
 
-    Sequence<T>* Prepend(T item) override {
+    Sequence<T>* Prepend(const T& item) override {
         ListSequence<T>* result = Instance();
         result->PrependInternal(item);
         return result;
     }
 
-    Sequence<T>* InsertAt(T item, int index) override {
+    Sequence<T>* InsertAt(const T& item, int index) override {
         ListSequence<T>* result = Instance();
         result->InsertAtInternal(item, index);
         return result;
     }
 
-    Sequence<T>* Concat(Sequence<T>* other) override {
+    Sequence<T>* Concat(const Sequence<T>* other) override {
         ListSequence<T>* result = Instance();
         result->ConcatInternal(other);
         return result;
     }
 
-    Sequence<T>* GetSubsequence(int start, int end) override {
+    Sequence<T>* GetSubsequence(int start, int end) const override {
         if (start < 0 || end >= GetLength() || start > end) {
             throw IndexOutOfRange(start, GetLength());
         }
 
-        Sequence<T>* result = CreateEmpty();
-        for (int i = start; i <= end; i++) {
-            Sequence<T>* updated = result->Append(items->Get(i));
-            if (updated != result) {
-                delete result;
+        Sequence<T>* result = this->CreateAccumulator();
+        IEnumerator<T>* enumerator = items->GetEnumerator();
+        int index = 0;
+        while (enumerator->MoveNext()) {
+            if (index > end) {
+                break;
             }
-            result = updated;
+            if (index >= start) {
+                Sequence<T>* updated = result->Append(enumerator->GetCurrent());
+                if (updated != result) {
+                    delete result;
+                }
+                result = updated;
+            }
+            index++;
         }
-        return result;
+        delete enumerator;
+        return this->FinalizeAccumulator(result);
     }
 };

@@ -87,8 +87,11 @@ int currentTestAssertions = 0;
     currentTestAssertions = 0; \
     try { \
         name(); \
-    } catch (const std::exception& e) { \
+    } catch (const Exception& e) { \
         std::cout << COLOR_RED "  FAIL" COLOR_RESET << " Непредвиденное исключение: " << e.what() << std::endl; \
+        currentTestPassed = false; \
+    } catch (...) { \
+        std::cout << COLOR_RED "  FAIL" COLOR_RESET << " Непредвиденное исключение неизвестного типа" << std::endl; \
         currentTestPassed = false; \
     } \
     allResults.push_back({#name, currentTestPassed, currentTestAssertions, currentTestPassed ? currentTestAssertions : 0}); \
@@ -111,26 +114,34 @@ void PrintSubHeader(const std::string& text) {
 }
 
 template<class T>
-void PrintSequence(const std::string& label, Sequence<T>* seq) {
+void PrintSequence(const std::string& label, const Sequence<T>* seq) {
     std::cout << "    " << label << ": [";
-    for (int i = 0; i < seq->GetLength(); i++) {
-        std::cout << seq->Get(i);
-        if (i < seq->GetLength() - 1) {
+    IEnumerator<T>* enumerator = seq->GetEnumerator();
+    bool first = true;
+    while (enumerator->MoveNext()) {
+        if (!first) {
             std::cout << ", ";
         }
+        std::cout << enumerator->GetCurrent();
+        first = false;
     }
+    delete enumerator;
     std::cout << "]" << std::endl;
 }
 
-void PrintTupleSequence(const std::string& label, Sequence<std::tuple<int, char>>* seq) {
+void PrintTupleSequence(const std::string& label, const Sequence<std::tuple<int, char>>* seq) {
     std::cout << "    " << label << ": [";
-    for (int i = 0; i < seq->GetLength(); i++) {
-        auto item = seq->Get(i);
-        std::cout << "(" << std::get<0>(item) << ", " << std::get<1>(item) << ")";
-        if (i < seq->GetLength() - 1) {
+    IEnumerator<std::tuple<int, char>>* enumerator = seq->GetEnumerator();
+    bool first = true;
+    while (enumerator->MoveNext()) {
+        auto item = enumerator->GetCurrent();
+        if (!first) {
             std::cout << ", ";
         }
+        std::cout << "(" << std::get<0>(item) << ", " << std::get<1>(item) << ")";
+        first = false;
     }
+    delete enumerator;
     std::cout << "]" << std::endl;
 }
 

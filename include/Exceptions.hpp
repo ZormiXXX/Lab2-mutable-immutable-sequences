@@ -1,34 +1,59 @@
 #pragma once
-#include <exception>
 #include <string>
 
-class IndexOutOfRange : public std::exception {
-private:
+class Exception {
+protected:
     std::string message;
+
 public:
-    IndexOutOfRange(int index, int size) {
-        message = "IndexOutOfRange: index=" + std::to_string(index) + 
-                  ", size=" + std::to_string(size);
-    }
-    const char* what() const noexcept override {
+    Exception() = default;
+
+    explicit Exception(const std::string& text) : message(text) {}
+
+    virtual ~Exception() = default;
+
+    virtual const char* what() const noexcept {
         return message.c_str();
     }
 };
 
-class EmptyCollection : public std::exception {
+class IndexOutOfRange : public Exception {
 private:
-    std::string message = "EmptyCollection: collection is empty";
 public:
-    const char* what() const noexcept override {
-        return message.c_str();
-    }
+    IndexOutOfRange(int index, int size)
+        : Exception("IndexOutOfRange: index=" + std::to_string(index) +
+                    ", size=" + std::to_string(size)) {}
 };
 
-class ElementNotFound : public std::exception {
-private:
-    std::string message = "ElementNotFound: no matching element was found";
+class InvalidArgument : public Exception {
 public:
-    const char* what() const noexcept override {
-        return message.c_str();
-    }
+    explicit InvalidArgument(const std::string& details)
+        : Exception("InvalidArgument: " + details) {}
+};
+
+class InvalidState : public Exception {
+public:
+    explicit InvalidState(const std::string& details)
+        : Exception("InvalidState: " + details) {}
+};
+
+class InputError : public Exception {
+public:
+    explicit InputError(const std::string& details)
+        : Exception("InputError: " + details) {}
+};
+
+class EmptyCollection : public Exception {
+public:
+    EmptyCollection() : Exception("EmptyCollection: collection is empty") {}
+};
+
+class ElementNotFound : public Exception {
+public:
+    ElementNotFound() : Exception("ElementNotFound: no matching element was found") {}
+};
+
+class NoValuePresent : public Exception {
+public:
+    NoValuePresent() : Exception("NoValuePresent: trying to get value from None") {}
 };
