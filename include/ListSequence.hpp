@@ -3,7 +3,16 @@
 #include "Sequence.hpp"
 
 template<class T>
-class ListSequence : public Sequence<T> {
+class ImmutableListSequence;
+
+template<class T>
+class ListSequence : public SequenceCRTP<T, ListSequence<T>> {
+    template<class, class>
+    friend class SequenceCRTP;
+
+    template<class>
+    friend class ImmutableListSequence;
+
 protected:
     LinkedList<T>* items;
 
@@ -11,7 +20,8 @@ protected:
         return new ListSequence<T>(*this);
     }
 
-    virtual ListSequence<T>* Instance() {
+    virtual ListSequence<T>* Instance(int expectedLength) {
+        (void)expectedLength;
         return this;
     }
 
@@ -28,9 +38,12 @@ protected:
     }
 
     void ConcatInternal(const Sequence<T>* other) {
+        int limit = other == this ? GetLength() : other->GetLength();
         IEnumerator<T>* enumerator = other->GetEnumerator();
-        while (enumerator->MoveNext()) {
+        int copied = 0;
+        while (copied < limit && enumerator->MoveNext()) {
             items->Append(enumerator->GetCurrent());
+            copied++;
         }
         delete enumerator;
     }
@@ -46,12 +59,20 @@ public:
 
     explicit ListSequence(const LinkedList<T>* list) : items(new LinkedList<T>(*list)) {}
 
+    explicit ListSequence(LinkedList<T>* list) : items(list) {}
+
     ~ListSequence() override {
         delete items;
     }
 
     LinkedList<T>* CopyStorage() const {
         return new LinkedList<T>(*items);
+    }
+
+    LinkedList<T>* ReleaseStorage() {
+        LinkedList<T>* released = items;
+        items = nullptr;
+        return released;
     }
 
     const T& Get(int index) const override {
@@ -80,30 +101,6 @@ public:
 
     IEnumerator<T>* GetEnumerator() const override {
         return items->GetEnumerator();
-    }
-
-    Sequence<T>* Append(const T& item) override {
-        ListSequence<T>* result = Instance();
-        result->AppendInternal(item);
-        return result;
-    }
-
-    Sequence<T>* Prepend(const T& item) override {
-        ListSequence<T>* result = Instance();
-        result->PrependInternal(item);
-        return result;
-    }
-
-    Sequence<T>* InsertAt(const T& item, int index) override {
-        ListSequence<T>* result = Instance();
-        result->InsertAtInternal(item, index);
-        return result;
-    }
-
-    Sequence<T>* Concat(const Sequence<T>* other) override {
-        ListSequence<T>* result = Instance();
-        result->ConcatInternal(other);
-        return result;
     }
 
     Sequence<T>* GetSubsequence(int start, int end) const override {

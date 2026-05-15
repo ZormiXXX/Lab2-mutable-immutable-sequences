@@ -13,13 +13,14 @@ protected:
     }
 
     Sequence<T>* FinalizeAccumulator(Sequence<T>* accumulator) const override {
-        auto* builder = dynamic_cast<ListSequence<T>*>(accumulator);
-        Sequence<T>* result = new ImmutableListSequence<T>(builder->CopyStorage());
+        auto* builder = static_cast<ListSequence<T>*>(accumulator);
+        Sequence<T>* result = new ImmutableListSequence<T>(builder->ReleaseStorage());
         delete accumulator;
         return result;
     }
 
-    ImmutableListSequence<T>* Instance() override {
+    ImmutableListSequence<T>* Instance(int expectedLength) override {
+        (void)expectedLength;
         return Clone();
     }
 
@@ -34,6 +35,8 @@ public:
     explicit ImmutableListSequence(const LinkedList<T>& list) : ListSequence<T>(list) {}
 
     explicit ImmutableListSequence(const LinkedList<T>* list) : ListSequence<T>(list) {}
+
+    explicit ImmutableListSequence(LinkedList<T>* list) : ListSequence<T>(list) {}
 
     ~ImmutableListSequence() override = default;
 

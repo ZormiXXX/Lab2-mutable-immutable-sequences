@@ -8,7 +8,8 @@ protected:
         return new MutableArraySequence<T>(*this);
     }
 
-    MutableArraySequence<T>* Instance() override {
+    MutableArraySequence<T>* Instance(int expectedLength) override {
+        (void)expectedLength;
         return this;
     }
 

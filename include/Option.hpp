@@ -11,7 +11,7 @@ private:
         value = nullptr;
     }
 
-    public:
+public:
     Option() : value(nullptr) {}
 
     Option(const Option<T>& other) : value(nullptr) {
@@ -65,7 +65,7 @@ private:
         return value == nullptr;
     }
 
-    T GetValue() const {
+    const T& GetValue() const {
         if (value == nullptr) {
             throw NoValuePresent();
         }

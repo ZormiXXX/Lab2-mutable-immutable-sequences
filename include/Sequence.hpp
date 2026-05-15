@@ -2,15 +2,41 @@
 #include "Exceptions.hpp"
 #include "IEnumerable.hpp"
 #include "Option.hpp"
-#include <algorithm>
-#include <tuple>
-#include <utility>
 
 template<class T>
 class ArraySequence;
 
 template<class T>
 class Sequence;
+
+template<class T, class Derived>
+class SequenceCRTP;
+
+template<class First, class Second>
+struct Tuple {
+    First first;
+    Second second;
+
+    Tuple() : first(), second() {}
+
+    Tuple(const First& firstValue, const Second& secondValue)
+        : first(firstValue), second(secondValue) {}
+};
+
+template<class TupleType>
+struct TupleTraits;
+
+template<class First, class Second>
+struct TupleTraits<Tuple<First, Second>> {
+    using FirstType = First;
+    using SecondType = Second;
+};
+
+template<class First, class Second>
+struct SequencePair {
+    Sequence<First>* first;
+    Sequence<Second>* second;
+};
 
 template<class T>
 class SequenceEnumerator : public IEnumerator<T> {
@@ -103,7 +129,7 @@ public:
         Sequence<T>* result = CreateAccumulator();
         IEnumerator<T>* enumerator = GetEnumerator();
         while (enumerator->MoveNext()) {
-            T item = enumerator->GetCurrent();
+            const T& item = enumerator->GetCurrent();
             if (pred(item)) {
                 Sequence<T>* updated = result->Append(item);
                 if (updated != result) {
@@ -120,7 +146,7 @@ public:
     T Find(Predicate pred) const {
         IEnumerator<T>* enumerator = GetEnumerator();
         while (enumerator->MoveNext()) {
-            T item = enumerator->GetCurrent();
+            const T& item = enumerator->GetCurrent();
             if (pred(item)) {
                 delete enumerator;
                 return item;
@@ -131,13 +157,13 @@ public:
     }
 
     template<typename U>
-    Sequence<std::tuple<T, U>>* Zip(const Sequence<U>* other) const {
-        auto* result = new ArraySequence<std::tuple<T, U>>();
+    Sequence<Tuple<T, U>>* Zip(const Sequence<U>* other) const {
+        auto* result = new ArraySequence<Tuple<T, U>>();
         IEnumerator<T>* left = GetEnumerator();
         IEnumerator<U>* right = other->GetEnumerator();
 
         while (left->MoveNext() && right->MoveNext()) {
-            result->Append(std::make_tuple(left->GetCurrent(), right->GetCurrent()));
+            result->Append(Tuple<T, U>(left->GetCurrent(), right->GetCurrent()));
         }
 
         delete left;
@@ -146,19 +172,19 @@ public:
     }
 
     template<
-        typename Tuple = T,
-        typename First = std::tuple_element_t<0, Tuple>,
-        typename Second = std::tuple_element_t<1, Tuple>
+        typename TupleType = T,
+        typename First = typename TupleTraits<TupleType>::FirstType,
+        typename Second = typename TupleTraits<TupleType>::SecondType
     >
-    std::pair<Sequence<First>*, Sequence<Second>*> Unzip() const {
+    SequencePair<First, Second> Unzip() const {
         auto* first = new ArraySequence<First>();
         auto* second = new ArraySequence<Second>();
 
         IEnumerator<T>* enumerator = GetEnumerator();
         while (enumerator->MoveNext()) {
-            Tuple item = enumerator->GetCurrent();
-            first->Append(std::get<0>(item));
-            second->Append(std::get<1>(item));
+            const TupleType& item = enumerator->GetCurrent();
+            first->Append(item.first);
+            second->Append(item.second);
         }
         delete enumerator;
 
@@ -172,7 +198,7 @@ public:
         IEnumerator<T>* enumerator = GetEnumerator();
 
         while (enumerator->MoveNext()) {
-            T item = enumerator->GetCurrent();
+            const T& item = enumerator->GetCurrent();
             if (pred(item)) {
                 if (current->GetLength() > 0) {
                     result->Append(FinalizeAccumulator(current));
@@ -235,7 +261,7 @@ public:
                 replacementInserted = true;
             }
 
-            T item = source->GetCurrent();
+            const T& item = source->GetCurrent();
             if (currentIndex < actualIndex || currentIndex >= skipUntil) {
                 Sequence<T>* updated = result->Append(item);
                 if (updated != result) {
@@ -273,7 +299,7 @@ public:
     Option<T> TryFind(Predicate pred) const {
         IEnumerator<T>* enumerator = GetEnumerator();
         while (enumerator->MoveNext()) {
-            T item = enumerator->GetCurrent();
+            const T& item = enumerator->GetCurrent();
             if (pred(item)) {
                 delete enumerator;
                 return Option<T>::Some(item);
@@ -304,6 +330,39 @@ public:
     static Sequence<T>* From(const T* arr, int count) {
         ArraySequence<T> factory;
         return factory.CreateFromArray(arr, count);
+    }
+};
+
+template<class T, class Derived>
+class SequenceCRTP : public Sequence<T> {
+private:
+    Derived* Self() {
+        return static_cast<Derived*>(this);
+    }
+
+public:
+    Sequence<T>* Append(const T& item) override {
+        Derived* result = Self()->Instance(this->GetLength() + 1);
+        result->AppendInternal(item);
+        return result;
+    }
+
+    Sequence<T>* Prepend(const T& item) override {
+        Derived* result = Self()->Instance(this->GetLength() + 1);
+        result->PrependInternal(item);
+        return result;
+    }
+
+    Sequence<T>* InsertAt(const T& item, int index) override {
+        Derived* result = Self()->Instance(this->GetLength() + 1);
+        result->InsertAtInternal(item, index);
+        return result;
+    }
+
+    Sequence<T>* Concat(const Sequence<T>* other) override {
+        Derived* result = Self()->Instance(this->GetLength() + other->GetLength());
+        result->ConcatInternal(other);
+        return result;
     }
 };
 

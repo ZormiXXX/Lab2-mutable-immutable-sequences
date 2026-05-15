@@ -10,7 +10,7 @@ private:
         Node* next;
         Node(const T& val) : value(val), next(nullptr) {}
     };
-    
+
     Node* head;
     Node* tail;
     int length;
@@ -50,7 +50,18 @@ public:
     };
 
 private:
-    
+    void Clear() {
+        Node* current = head;
+        while (current != nullptr) {
+            Node* next = current->next;
+            delete current;
+            current = next;
+        }
+        head = nullptr;
+        tail = nullptr;
+        length = 0;
+    }
+
     Node* GetNode(int index) const {
         if (index < 0 || index >= length) {
             throw IndexOutOfRange(index, length);
@@ -61,22 +72,22 @@ private:
         }
         return current;
     }
-    
+
     void CopyFrom(const LinkedList<T>& other) {
         length = 0;
         head = nullptr;
         tail = nullptr;
-        
+
         Node* current = other.head;
         while (current != nullptr) {
             Append(current->value);
             current = current->next;
         }
     }
-    
+
 public:
     LinkedList() : head(nullptr), tail(nullptr), length(0) {}
-    
+
     LinkedList(const T* items, int count) : head(nullptr), tail(nullptr), length(0) {
         if (count < 0) {
             throw IndexOutOfRange(count, 0);
@@ -85,38 +96,61 @@ public:
             Append(items[i]);
         }
     }
-    
+
     LinkedList(const LinkedList<T>& other) : head(nullptr), tail(nullptr), length(0) {
         CopyFrom(other);
     }
-    
-    ~LinkedList() {
-        Node* current = head;
-        while (current != nullptr) {
-            Node* next = current->next;
-            delete current;
-            current = next;
-        }
+
+    LinkedList(LinkedList<T>&& other) noexcept
+        : head(other.head), tail(other.tail), length(other.length) {
+        other.head = nullptr;
+        other.tail = nullptr;
+        other.length = 0;
     }
-    
+
+    ~LinkedList() {
+        Clear();
+    }
+
+    LinkedList<T>& operator=(const LinkedList<T>& other) {
+        if (this != &other) {
+            Clear();
+            CopyFrom(other);
+        }
+        return *this;
+    }
+
+    LinkedList<T>& operator=(LinkedList<T>&& other) noexcept {
+        if (this != &other) {
+            Clear();
+            head = other.head;
+            tail = other.tail;
+            length = other.length;
+            other.head = nullptr;
+            other.tail = nullptr;
+            other.length = 0;
+        }
+        return *this;
+    }
+
     const T& GetFirst() const {
         if (length == 0) {
             throw IndexOutOfRange(0, length);
         }
         return head->value;
     }
-    
+
     const T& GetLast() const {
         if (length == 0) {
             throw IndexOutOfRange(0, length);
         }
         return tail->value;
     }
-    
+
     const T& Get(int index) const {
         return GetNode(index)->value;
     }
-    
+
     LinkedList<T>* GetSubList(int start, int end) const {
         if (start < 0 || end >= length || start > end) {
             throw IndexOutOfRange(start, length);
@@ -133,7 +167,7 @@ public:
         }
         return result;
     }
-    
+
     int GetLength() const {
         return length;
     }
@@ -150,7 +184,7 @@ public:
     IEnumerator<T>* GetEnumerator() const {
         return new Enumerator(this);
     }
-    
+
     void Append(const T& item) {
         Node* newNode = new Node(item);
         if (length == 0) {
@@ -161,7 +195,7 @@ public:
         }
         length++;
     }
-    
+
     void Prepend(const T& item) {
         Node* newNode = new Node(item);
         if (length == 0) {
@@ -172,24 +206,24 @@ public:
         }
         length++;
     }
-    
+
     void InsertAt(const T& item, int index) {
         if (index < 0 || index >= length) {
             throw IndexOutOfRange(index, length);
         }
-        
+
         if (index == 0) {
             Prepend(item);
             return;
         }
-        
+
         Node* prev = GetNode(index - 1);
         Node* newNode = new Node(item);
         newNode->next = prev->next;
         prev->next = newNode;
         length++;
     }
-    
+
     LinkedList<T>* Concat(const LinkedList<T>* list) const {
         LinkedList<T>* result = new LinkedList<T>(*this);
         Node* current = list->head;
@@ -199,11 +233,11 @@ public:
         }
         return result;
     }
-    
+
     T& operator[](int index) {
         return GetNode(index)->value;
     }
-    
+
     const T& operator[](int index) const {
         return GetNode(index)->value;
     }

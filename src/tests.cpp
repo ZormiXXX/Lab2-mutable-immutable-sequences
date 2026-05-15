@@ -1,7 +1,6 @@
 #include <iomanip>
 #include <iostream>
 #include <string>
-#include <tuple>
 #include <vector>
 #include "../include/Immutable/ImmutableArraySequence.hpp"
 #include "../include/Immutable/ImmutableListSequence.hpp"
@@ -129,16 +128,16 @@ void PrintSequence(const std::string& label, const Sequence<T>* seq) {
     std::cout << "]" << std::endl;
 }
 
-void PrintTupleSequence(const std::string& label, const Sequence<std::tuple<int, char>>* seq) {
+void PrintTupleSequence(const std::string& label, const Sequence<Tuple<int, char>>* seq) {
     std::cout << "    " << label << ": [";
-    IEnumerator<std::tuple<int, char>>* enumerator = seq->GetEnumerator();
+    IEnumerator<Tuple<int, char>>* enumerator = seq->GetEnumerator();
     bool first = true;
     while (enumerator->MoveNext()) {
-        auto item = enumerator->GetCurrent();
+        const Tuple<int, char>& item = enumerator->GetCurrent();
         if (!first) {
             std::cout << ", ";
         }
-        std::cout << "(" << std::get<0>(item) << ", " << std::get<1>(item) << ")";
+        std::cout << "(" << item.first << ", " << item.second << ")";
         first = false;
     }
     delete enumerator;
@@ -266,6 +265,36 @@ TEST(TestConcatAndSubsequence) {
     delete sub;
 }
 
+TEST(TestSelfConcat) {
+    PrintSubHeader("Concat последовательности с самой собой");
+    int arr[] = {1, 2, 3};
+
+    MutableArraySequence<int> arraySeq(arr, 3);
+    arraySeq.Concat(&arraySeq);
+    ASSERT_EQ(6, arraySeq.GetLength(), "MutableArraySequence удваивает длину один раз");
+    ASSERT_EQ(1, arraySeq.Get(3), "MutableArraySequence копирует исходный первый элемент");
+    ASSERT_EQ(3, arraySeq.Get(5), "MutableArraySequence копирует исходный последний элемент");
+
+    MutableListSequence<int> listSeq(arr, 3);
+    listSeq.Concat(&listSeq);
+    ASSERT_EQ(6, listSeq.GetLength(), "MutableListSequence удваивает длину один раз");
+    ASSERT_EQ(1, listSeq.Get(3), "MutableListSequence копирует исходный первый элемент");
+    ASSERT_EQ(3, listSeq.Get(5), "MutableListSequence копирует исходный последний элемент");
+
+    ImmutableArraySequence<int> immutableArray(arr, 3);
+    Sequence<int>* arrayResult = immutableArray.Concat(&immutableArray);
+    ASSERT_EQ(3, immutableArray.GetLength(), "ImmutableArraySequence сохраняет оригинал");
+    ASSERT_EQ(6, arrayResult->GetLength(), "ImmutableArraySequence возвращает удвоенную копию");
+
+    ImmutableListSequence<int> immutableList(arr, 3);
+    Sequence<int>* listResult = immutableList.Concat(&immutableList);
+    ASSERT_EQ(3, immutableList.GetLength(), "ImmutableListSequence сохраняет оригинал");
+    ASSERT_EQ(6, listResult->GetLength(), "ImmutableListSequence возвращает удвоенную копию");
+
+    delete arrayResult;
+    delete listResult;
+}
+
 TEST(TestSlice) {
     PrintSubHeader("Slice");
     int arr[] = {1, 2, 3, 4, 5};
@@ -341,11 +370,11 @@ TEST(TestZipAndUnzip) {
     MutableArraySequence<int> seq1(numbers, 3);
     Sequence<char>* seq2 = Sequence<char>::From(letters, 4);
 
-    Sequence<std::tuple<int, char>>* zipped = seq1.Zip(seq2);
+    Sequence<Tuple<int, char>>* zipped = seq1.Zip(seq2);
     PrintTupleSequence("Zip", zipped);
     ASSERT_EQ(3, zipped->GetLength(), "Zip обрезает по минимальной длине");
-    ASSERT_EQ(1, std::get<0>(zipped->Get(0)), "Первый числовой элемент");
-    ASSERT_EQ('C', std::get<1>(zipped->Get(2)), "Последний символьный элемент");
+    ASSERT_EQ(1, zipped->Get(0).first, "Первый числовой элемент");
+    ASSERT_EQ('C', zipped->Get(2).second, "Последний символьный элемент");
 
     auto [unzippedFirst, unzippedSecond] = zipped->Unzip();
     ASSERT_EQ(3, unzippedFirst->GetLength(), "Unzip восстанавливает длину первой последовательности");
@@ -495,6 +524,7 @@ void RunAllTests() {
     RUN_TEST(TestImmutableListSequence);
     RUN_TEST(TestSequence_InsertAtContract);
     RUN_TEST(TestConcatAndSubsequence);
+    RUN_TEST(TestSelfConcat);
     RUN_TEST(TestSlice);
 
     PrintHeader("ТЕСТИРОВАНИЕ MAP-REDUCE");

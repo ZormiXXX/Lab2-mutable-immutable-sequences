@@ -1,9 +1,7 @@
-#include <chrono>
 #include <clocale>
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <tuple>
 #include <vector>
 
 #include "../include/Immutable/ImmutableArraySequence.hpp"
@@ -38,17 +36,17 @@ std::string FormatSequence(const Sequence<T>* seq) {
     return builder.str();
 }
 
-std::string FormatTupleSequence(const Sequence<std::tuple<int, char>>* seq) {
+std::string FormatTupleSequence(const Sequence<Tuple<int, char>>* seq) {
     std::ostringstream builder;
     builder << "[";
-    IEnumerator<std::tuple<int, char>>* enumerator = seq->GetEnumerator();
+    IEnumerator<Tuple<int, char>>* enumerator = seq->GetEnumerator();
     bool first = true;
     while (enumerator->MoveNext()) {
         if (!first) {
             builder << ", ";
         }
-        auto item = enumerator->GetCurrent();
-        builder << "(" << std::get<0>(item) << ", " << std::get<1>(item) << ")";
+        const Tuple<int, char>& item = enumerator->GetCurrent();
+        builder << "(" << item.first << ", " << item.second << ")";
         first = false;
     }
     delete enumerator;
@@ -61,7 +59,7 @@ void PrintSequence(const std::string& label, const Sequence<T>* seq) {
     std::cout << "\n    " << label << ": " << FormatSequence(seq) << std::endl;
 }
 
-void PrintTupleSequence(const std::string& label, const Sequence<std::tuple<int, char>>* seq) {
+void PrintTupleSequence(const std::string& label, const Sequence<Tuple<int, char>>* seq) {
     std::cout << "\n    " << label << ": " << FormatTupleSequence(seq) << std::endl;
 }
 
@@ -129,7 +127,6 @@ void ShowMenu(const Sequence<int>* seq) {
     std::cout << "║   20. Показать последовательность                       ║" << std::endl;
     std::cout << "║   21. Показать длину                                    ║" << std::endl;
     std::cout << "║   22. Запустить модульные тесты                         ║" << std::endl;
-    std::cout << "║   23. Сравнить производительность                       ║" << std::endl;
     std::cout << "╠══════════════════════════════════════════════════════════╣" << std::endl;
     std::cout << "║   0. Выход                                              ║" << std::endl;
     std::cout << "╚══════════════════════════════════════════════════════════╝" << std::endl;
@@ -198,44 +195,6 @@ void RequireSequence(Sequence<int>* seq) {
     if (seq == nullptr) {
         throw InvalidState("сначала создайте последовательность");
     }
-}
-
-template<class Factory>
-double MeasureAppendPerformance(Factory factory, int operations) {
-    Sequence<int>* seq = factory();
-    auto start = std::chrono::high_resolution_clock::now();
-
-    for (int i = 0; i < operations; i++) {
-        Sequence<int>* updated = seq->Append(i);
-        if (updated != seq) {
-            delete seq;
-            seq = updated;
-        }
-    }
-
-    auto finish = std::chrono::high_resolution_clock::now();
-    delete seq;
-
-    return std::chrono::duration<double, std::milli>(finish - start).count();
-}
-
-void RunPerformanceComparison() {
-    const int operations = 1500;
-
-    std::cout << "\nСравнение производительности (" << operations << " операций Append)" << std::endl;
-    std::cout << "-------------------------------------------------------------" << std::endl;
-    std::cout << "MutableArraySequence:   "
-              << MeasureAppendPerformance([]() { return new MutableArraySequence<int>(); }, operations)
-              << " ms" << std::endl;
-    std::cout << "ImmutableArraySequence: "
-              << MeasureAppendPerformance([]() { return new ImmutableArraySequence<int>(); }, operations)
-              << " ms" << std::endl;
-    std::cout << "MutableListSequence:    "
-              << MeasureAppendPerformance([]() { return new MutableListSequence<int>(); }, operations)
-              << " ms" << std::endl;
-    std::cout << "ImmutableListSequence:  "
-              << MeasureAppendPerformance([]() { return new ImmutableListSequence<int>(); }, operations)
-              << " ms" << std::endl;
 }
 
 }  // namespace
@@ -376,7 +335,7 @@ int main() {
                     RequireSequence(seq);
                     char letters[] = {'A', 'B', 'C', 'D', 'E'};
                     Sequence<char>* second = Sequence<char>::From(letters, 5);
-                    Sequence<std::tuple<int, char>>* zipped = seq->Zip(second);
+                    Sequence<Tuple<int, char>>* zipped = seq->Zip(second);
                     PrintTupleSequence("Zip результат", zipped);
                     delete zipped;
                     delete second;
@@ -386,7 +345,7 @@ int main() {
                     RequireSequence(seq);
                     char letters[] = {'A', 'B', 'C', 'D', 'E'};
                     Sequence<char>* second = Sequence<char>::From(letters, 5);
-                    Sequence<std::tuple<int, char>>* zipped = seq->Zip(second);
+                    Sequence<Tuple<int, char>>* zipped = seq->Zip(second);
                     PrintTupleSequence("Исходная zip-последовательность", zipped);
 
                     auto [first, secondPart] = zipped->Unzip();
@@ -436,9 +395,6 @@ int main() {
                     break;
                 case 22:
                     RunAllTests();
-                    break;
-                case 23:
-                    RunPerformanceComparison();
                     break;
                 case 0:
                     delete seq;

@@ -4,7 +4,16 @@
 #include "Sequence.hpp"
 
 template<class T>
-class ArraySequence : public Sequence<T> {
+class ImmutableArraySequence;
+
+template<class T>
+class ArraySequence : public SequenceCRTP<T, ArraySequence<T>> {
+    template<class, class>
+    friend class SequenceCRTP;
+
+    template<class>
+    friend class ImmutableArraySequence;
+
 protected:
     DynamicArray<T>* items;
 
@@ -12,7 +21,8 @@ protected:
         return new ArraySequence<T>(*this);
     }
 
-    virtual ArraySequence<T>* Instance() {
+    virtual ArraySequence<T>* Instance(int expectedLength) {
+        (void)expectedLength;
         return this;
     }
 
@@ -32,6 +42,17 @@ protected:
     }
 
     void ConcatInternal(const Sequence<T>* other) {
+        int originalLength = GetLength();
+        int otherLength = other->GetLength();
+        items->Reserve(originalLength + otherLength);
+
+        if (other == this) {
+            for (int i = 0; i < originalLength; i++) {
+                AppendInternal(items->Get(i));
+            }
+            return;
+        }
+
         IEnumerator<T>* enumerator = other->GetEnumerator();
         while (enumerator->MoveNext()) {
             AppendInternal(enumerator->GetCurrent());
@@ -62,6 +83,16 @@ public:
         return new DynamicArray<T>(*items);
     }
 
+    DynamicArray<T>* CopyStorage(int minCapacity) const {
+        return new DynamicArray<T>(*items, minCapacity);
+    }
+
+    DynamicArray<T>* ReleaseStorage() {
+        DynamicArray<T>* released = items;
+        items = nullptr;
+        return released;
+    }
+
     const T& Get(int index) const override {
         return items->Get(index);
     }
@@ -87,30 +118,6 @@ public:
 
     Sequence<T>* CreateFromArray(const T* source, int count) const override {
         return new ArraySequence<T>(source, count);
-    }
-
-    Sequence<T>* Append(const T& item) override {
-        ArraySequence<T>* result = Instance();
-        result->AppendInternal(item);
-        return result;
-    }
-
-    Sequence<T>* Prepend(const T& item) override {
-        ArraySequence<T>* result = Instance();
-        result->PrependInternal(item);
-        return result;
-    }
-
-    Sequence<T>* InsertAt(const T& item, int index) override {
-        ArraySequence<T>* result = Instance();
-        result->InsertAtInternal(item, index);
-        return result;
-    }
-
-    Sequence<T>* Concat(const Sequence<T>* other) override {
-        ArraySequence<T>* result = Instance();
-        result->ConcatInternal(other);
-        return result;
     }
 
     Sequence<T>* GetSubsequence(int start, int end) const override {

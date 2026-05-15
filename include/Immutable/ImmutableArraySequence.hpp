@@ -13,14 +13,14 @@ protected:
     }
 
     Sequence<T>* FinalizeAccumulator(Sequence<T>* accumulator) const override {
-        auto* builder = dynamic_cast<ArraySequence<T>*>(accumulator);
-        Sequence<T>* result = new ImmutableArraySequence<T>(builder->CopyStorage());
+        auto* builder = static_cast<ArraySequence<T>*>(accumulator);
+        Sequence<T>* result = new ImmutableArraySequence<T>(builder->ReleaseStorage());
         delete accumulator;
         return result;
     }
 
-    ImmutableArraySequence<T>* Instance() override {
-        return Clone();
+    ImmutableArraySequence<T>* Instance(int expectedLength) override {
+        return new ImmutableArraySequence<T>(this->CopyStorage(expectedLength));
     }
 
 public:

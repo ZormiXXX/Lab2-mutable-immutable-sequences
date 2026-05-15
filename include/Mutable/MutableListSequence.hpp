@@ -8,7 +8,8 @@ protected:
         return new MutableListSequence<T>(*this);
     }
 
-    MutableListSequence<T>* Instance() override {
+    MutableListSequence<T>* Instance(int expectedLength) override {
+        (void)expectedLength;
         return this;
     }
 
