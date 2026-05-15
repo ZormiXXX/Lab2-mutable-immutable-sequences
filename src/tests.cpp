@@ -165,6 +165,24 @@ TEST(TestDynamicArray_Resize) {
     ASSERT_EQ(0, da.Get(4), "Новые элементы инициализированы");
 }
 
+TEST(TestDynamicArray_ReserveAndEnumerator) {
+    PrintSubHeader("Reserve и прямой Enumerator DynamicArray");
+    DynamicArray<int> da;
+    da.Reserve(10);
+    ASSERT_TRUE(da.GetCapacity() >= 10, "Reserve заранее выделяет ёмкость");
+
+    da.Append(5);
+    da.Append(10);
+    da.Append(15);
+
+    IEnumerator<int>* enumerator = da.GetEnumerator();
+    ASSERT_TRUE(enumerator->MoveNext(), "Enumerator DynamicArray переходит к первому элементу");
+    ASSERT_EQ(5, enumerator->GetCurrent(), "Enumerator DynamicArray читает первый элемент");
+    ASSERT_TRUE(enumerator->MoveNext(), "Enumerator DynamicArray переходит ко второму элементу");
+    ASSERT_EQ(10, enumerator->GetCurrent(), "Enumerator DynamicArray читает второй элемент");
+    delete enumerator;
+}
+
 TEST(TestDynamicArray_Exception) {
     PrintSubHeader("Исключения DynamicArray");
     DynamicArray<int> da(2);
@@ -295,6 +313,16 @@ TEST(TestSelfConcat) {
     delete listResult;
 }
 
+TEST(TestNullConcatContract) {
+    PrintSubHeader("Контракт Concat с nullptr");
+    int arr[] = {1, 2, 3};
+    MutableArraySequence<int> arraySeq(arr, 3);
+    MutableListSequence<int> listSeq(arr, 3);
+
+    ASSERT_THROWS(arraySeq.Concat(nullptr), InvalidArgument, "ArraySequence не принимает nullptr в Concat");
+    ASSERT_THROWS(listSeq.Concat(nullptr), InvalidArgument, "ListSequence не принимает nullptr в Concat");
+}
+
 TEST(TestSlice) {
     PrintSubHeader("Slice");
     int arr[] = {1, 2, 3, 4, 5};
@@ -312,9 +340,14 @@ TEST(TestSlice) {
     ASSERT_EQ(4, slicedFromEnd->GetLength(), "Slice с отрицательным индексом");
     ASSERT_EQ(5, slicedFromEnd->Get(3), "Последний элемент после удаления");
 
+    Sequence<int>* slicedToEnd = seq.Slice(3, 20);
+    ASSERT_EQ(3, slicedToEnd->GetLength(), "Slice ограничивает удаление концом последовательности");
+    ASSERT_EQ(3, slicedToEnd->GetLast(), "Slice сохраняет элементы до удаляемого диапазона");
+
     delete replacement;
     delete sliced;
     delete slicedFromEnd;
+    delete slicedToEnd;
 }
 
 TEST(TestMapAndFlatMap) {
@@ -435,6 +468,12 @@ TEST(TestEnumerator) {
     ASSERT_TRUE(enumerator->MoveNext(), "После Reset снова можно итерироваться");
     ASSERT_EQ(7, enumerator->GetCurrent(), "Reset возвращает перечислитель в начало");
     delete enumerator;
+
+    MutableArraySequence<int> arraySeq(arr, 3);
+    IEnumerator<int>* arrayEnumerator = arraySeq.GetEnumerator();
+    ASSERT_TRUE(arrayEnumerator->MoveNext(), "ArraySequence использует быстрый Enumerator");
+    ASSERT_EQ(7, arrayEnumerator->GetCurrent(), "ArraySequence Enumerator читает первый элемент");
+    delete arrayEnumerator;
 }
 
 TEST(TestOperatorOverload) {
@@ -511,6 +550,7 @@ void RunAllTests() {
     PrintHeader("ТЕСТИРОВАНИЕ DYNAMIC ARRAY");
     RUN_TEST(TestDynamicArray_Create);
     RUN_TEST(TestDynamicArray_Resize);
+    RUN_TEST(TestDynamicArray_ReserveAndEnumerator);
     RUN_TEST(TestDynamicArray_Exception);
 
     PrintHeader("ТЕСТИРОВАНИЕ LINKED LIST");
@@ -525,6 +565,7 @@ void RunAllTests() {
     RUN_TEST(TestSequence_InsertAtContract);
     RUN_TEST(TestConcatAndSubsequence);
     RUN_TEST(TestSelfConcat);
+    RUN_TEST(TestNullConcatContract);
     RUN_TEST(TestSlice);
 
     PrintHeader("ТЕСТИРОВАНИЕ MAP-REDUCE");

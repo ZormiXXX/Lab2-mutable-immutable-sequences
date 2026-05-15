@@ -63,6 +63,10 @@ protected:
 public:
     ArraySequence() : items(new DynamicArray<T>()) {}
 
+    explicit ArraySequence(int expectedLength) : items(new DynamicArray<T>()) {
+        items->Reserve(expectedLength);
+    }
+
     ArraySequence(const T* arr, int count) : items(new DynamicArray<T>(arr, count)) {}
 
     ArraySequence(DynamicArray<T>* arr) : items(arr) {}
@@ -120,12 +124,16 @@ public:
         return new ArraySequence<T>(source, count);
     }
 
+    IEnumerator<T>* GetEnumerator() const override {
+        return items->GetEnumerator();
+    }
+
     Sequence<T>* GetSubsequence(int start, int end) const override {
         if (start < 0 || end >= GetLength() || start > end) {
             throw IndexOutOfRange(start, GetLength());
         }
 
-        Sequence<T>* result = this->CreateAccumulator();
+        Sequence<T>* result = this->CreateAccumulator(end - start + 1);
         for (int i = start; i <= end; i++) {
             Sequence<T>* updated = result->Append(items->Get(i));
             if (updated != result) {

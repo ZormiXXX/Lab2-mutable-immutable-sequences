@@ -108,7 +108,7 @@ public:
             throw IndexOutOfRange(start, GetLength());
         }
 
-        Sequence<T>* result = this->CreateAccumulator();
+        Sequence<T>* result = this->CreateAccumulator(end - start + 1);
         IEnumerator<T>* enumerator = items->GetEnumerator();
         int index = 0;
         while (enumerator->MoveNext()) {

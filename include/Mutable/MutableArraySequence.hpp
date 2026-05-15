@@ -9,7 +9,7 @@ protected:
     }
 
     MutableArraySequence<T>* Instance(int expectedLength) override {
-        (void)expectedLength;
+        this->items->Reserve(expectedLength);
         return this;
     }
 

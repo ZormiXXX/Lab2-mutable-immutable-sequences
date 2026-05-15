@@ -1,5 +1,6 @@
 #pragma once
 #include "Exceptions.hpp"
+#include "IEnumerator.hpp"
 
 template<class T>
 class DynamicArray {
@@ -24,6 +25,34 @@ private:
     }
 
 public:
+    class Enumerator : public IEnumerator<T> {
+    private:
+        const DynamicArray<T>* array;
+        int index;
+
+    public:
+        explicit Enumerator(const DynamicArray<T>* source) : array(source), index(-1) {}
+
+        bool MoveNext() override {
+            if (index + 1 >= array->size) {
+                return false;
+            }
+            index++;
+            return true;
+        }
+
+        const T& GetCurrent() const override {
+            if (index < 0 || index >= array->size) {
+                throw IndexOutOfRange(index, array->size);
+            }
+            return array->data[index];
+        }
+
+        void Reset() override {
+            index = -1;
+        }
+    };
+
     DynamicArray() : data(nullptr), size(0), capacity(0) {}
 
     DynamicArray(const T* items, int count) : size(count), capacity(count) {
@@ -161,6 +190,10 @@ public:
 
     const T* RawData() const {
         return data;
+    }
+
+    IEnumerator<T>* GetEnumerator() const {
+        return new Enumerator(this);
     }
 
     void Resize(int newSize) {

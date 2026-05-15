@@ -12,6 +12,10 @@ protected:
         return new ArraySequence<T>();
     }
 
+    Sequence<T>* CreateAccumulator(int expectedLength) const override {
+        return new ArraySequence<T>(expectedLength);
+    }
+
     Sequence<T>* FinalizeAccumulator(Sequence<T>* accumulator) const override {
         auto* builder = static_cast<ArraySequence<T>*>(accumulator);
         Sequence<T>* result = new ImmutableArraySequence<T>(builder->ReleaseStorage());

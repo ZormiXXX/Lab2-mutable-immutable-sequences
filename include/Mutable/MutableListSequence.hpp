@@ -13,6 +13,11 @@ protected:
         return this;
     }
 
+    Sequence<T>* CreateAccumulator(int expectedLength) const override {
+        (void)expectedLength;
+        return new MutableListSequence<T>();
+    }
+
 public:
     MutableListSequence() : ListSequence<T>() {}
 

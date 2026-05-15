@@ -12,6 +12,11 @@ protected:
         return new ListSequence<T>();
     }
 
+    Sequence<T>* CreateAccumulator(int expectedLength) const override {
+        (void)expectedLength;
+        return new ListSequence<T>();
+    }
+
     Sequence<T>* FinalizeAccumulator(Sequence<T>* accumulator) const override {
         auto* builder = static_cast<ListSequence<T>*>(accumulator);
         Sequence<T>* result = new ImmutableListSequence<T>(builder->ReleaseStorage());

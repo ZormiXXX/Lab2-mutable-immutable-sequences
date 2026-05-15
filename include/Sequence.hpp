@@ -59,6 +59,11 @@ protected:
         return CreateEmpty();
     }
 
+    virtual Sequence<T>* CreateAccumulator(int expectedLength) const {
+        (void)expectedLength;
+        return CreateAccumulator();
+    }
+
     virtual Sequence<T>* FinalizeAccumulator(Sequence<T>* accumulator) const {
         return accumulator;
     }
@@ -83,7 +88,7 @@ public:
 
     template<typename Func>
     Sequence<T>* Map(Func f) const {
-        Sequence<T>* result = CreateAccumulator();
+        Sequence<T>* result = CreateAccumulator(GetLength());
         IEnumerator<T>* enumerator = GetEnumerator();
         while (enumerator->MoveNext()) {
             Sequence<T>* updated = result->Append(f(enumerator->GetCurrent()));
@@ -98,7 +103,7 @@ public:
 
     template<typename Func>
     Sequence<T>* FlatMap(Func f) const {
-        Sequence<T>* result = CreateAccumulator();
+        Sequence<T>* result = CreateAccumulator(GetLength());
         IEnumerator<T>* enumerator = GetEnumerator();
         while (enumerator->MoveNext()) {
             Sequence<T>* expanded = f(enumerator->GetCurrent());
@@ -126,7 +131,7 @@ public:
 
     template<typename Predicate>
     Sequence<T>* Where(Predicate pred) const {
-        Sequence<T>* result = CreateAccumulator();
+        Sequence<T>* result = CreateAccumulator(GetLength());
         IEnumerator<T>* enumerator = GetEnumerator();
         while (enumerator->MoveNext()) {
             const T& item = enumerator->GetCurrent();
@@ -158,7 +163,14 @@ public:
 
     template<typename U>
     Sequence<Tuple<T, U>>* Zip(const Sequence<U>* other) const {
-        auto* result = new ArraySequence<Tuple<T, U>>();
+        if (other == nullptr) {
+            throw InvalidArgument("other sequence must not be null");
+        }
+
+        int leftLength = GetLength();
+        int rightLength = other->GetLength();
+        int resultLength = leftLength < rightLength ? leftLength : rightLength;
+        auto* result = new ArraySequence<Tuple<T, U>>(resultLength);
         IEnumerator<T>* left = GetEnumerator();
         IEnumerator<U>* right = other->GetEnumerator();
 
@@ -177,8 +189,9 @@ public:
         typename Second = typename TupleTraits<TupleType>::SecondType
     >
     SequencePair<First, Second> Unzip() const {
-        auto* first = new ArraySequence<First>();
-        auto* second = new ArraySequence<Second>();
+        int length = GetLength();
+        auto* first = new ArraySequence<First>(length);
+        auto* second = new ArraySequence<Second>(length);
 
         IEnumerator<T>* enumerator = GetEnumerator();
         while (enumerator->MoveNext()) {
@@ -193,8 +206,9 @@ public:
 
     template<typename Predicate>
     Sequence<Sequence<T>*>* Split(Predicate pred) const {
-        auto* result = new ArraySequence<Sequence<T>*>();
-        Sequence<T>* current = CreateAccumulator();
+        int length = GetLength();
+        auto* result = new ArraySequence<Sequence<T>*>(length + 1);
+        Sequence<T>* current = CreateAccumulator(length);
         IEnumerator<T>* enumerator = GetEnumerator();
 
         while (enumerator->MoveNext()) {
@@ -202,7 +216,7 @@ public:
             if (pred(item)) {
                 if (current->GetLength() > 0) {
                     result->Append(FinalizeAccumulator(current));
-                    current = CreateAccumulator();
+                    current = CreateAccumulator(length);
                 }
             } else {
                 Sequence<T>* updated = current->Append(item);
@@ -228,21 +242,27 @@ public:
             throw InvalidArgument("count must be non-negative");
         }
 
+        int length = GetLength();
         int actualIndex = index;
         if (actualIndex < 0) {
-            actualIndex = GetLength() + actualIndex;
+            actualIndex = length + actualIndex;
         }
 
-        if (actualIndex < 0 || actualIndex > GetLength()) {
-            throw IndexOutOfRange(index, GetLength());
+        if (actualIndex < 0 || actualIndex > length) {
+            throw IndexOutOfRange(index, length);
         }
 
         int skipUntil = actualIndex + count;
         if (skipUntil < actualIndex) {
-            skipUntil = GetLength();
+            skipUntil = length;
+        }
+        if (skipUntil > length) {
+            skipUntil = length;
         }
 
-        Sequence<T>* result = CreateAccumulator();
+        int replacementLength = replacement == nullptr ? 0 : replacement->GetLength();
+        int removedLength = skipUntil - actualIndex;
+        Sequence<T>* result = CreateAccumulator(length - removedLength + replacementLength);
         IEnumerator<T>* source = GetEnumerator();
         int currentIndex = 0;
         bool replacementInserted = false;
@@ -360,6 +380,9 @@ public:
     }
 
     Sequence<T>* Concat(const Sequence<T>* other) override {
+        if (other == nullptr) {
+            throw InvalidArgument("other sequence must not be null");
+        }
         Derived* result = Self()->Instance(this->GetLength() + other->GetLength());
         result->ConcatInternal(other);
         return result;
