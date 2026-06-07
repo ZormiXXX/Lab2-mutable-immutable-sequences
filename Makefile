@@ -1,6 +1,6 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -I./include
-
+LDLIBS = -lncurses
 
 SRC_DIR = src
 BUILD_DIR = build
@@ -19,7 +19,7 @@ $(BUILD_DIR):
 
 $(TARGET): $(OBJECTS)
 	@echo "Линковка..."
-	$(CXX) $(CXXFLAGS) -o $@ $^
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDLIBS)
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
 	@echo "Компиляция $<..."
